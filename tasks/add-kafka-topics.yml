@@ -1,0 +1,15 @@
+# (c) 2017 DataNexus Inc.  All Rights Reserved
+---
+- name: Set the connection string used to communicate with Zookeeper
+  set_fact: 
+    zk_node_str: "{{(zk_nodes | default(['localhost'])) | join(':2181,')}}:2181"
+- name: Create kafka topics
+  run_once: true
+  become: true
+  become_user: "{{kafka_user}}"
+  shell: "{{kafka_topics_cmd}} --create --zookeeper {{zk_node_str}} --replication-factor {{[(item.repl_factor | default(1)), (kafka_nodes | length)] | min}} --partitions {{[(item.partitions | default(1)),(kafka_nodes | length)] | min}} --topic {{item.name}}"
+  with_items: "{{ kafka_topics_list | default([]) }}"
+  register: command_result
+  failed_when:
+    - "'already exists' not in command_result.stdout"
+    - "command_result.rc != 0"

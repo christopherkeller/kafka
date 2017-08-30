@@ -1,0 +1,27 @@
+# (c) 2017 DataNexus Inc.  All Rights Reserved
+---
+# start up the appropriate services, including the bundled
+# kafka-zookeeper service if we are performing a single-node
+# kafka deployment
+- block:
+  - name: Start bundled kafka-zookeeper service
+    service:
+      name: kafka-zookeeper
+      state: restarted
+    when: (zk_nodes | default([])) == []
+  - name: Pause before starting kafka service
+    command: sleep 10
+    when: (zk_nodes | default([])) == []
+  - name: Start kafka service
+    service:
+      name: kafka
+      state: restarted
+  - name: Pause before starting confluent-schema-registry service
+    command: sleep 10
+    when: kafka_distro == "confluent"
+  - name: Start confluent-schema-registry service
+    service:
+      name: confluent-schema-registry
+      state: restarted
+    when: kafka_distro == "confluent"
+  become: true

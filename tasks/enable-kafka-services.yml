@@ -1,0 +1,21 @@
+# (c) 2017 DataNexus Inc.  All Rights Reserved
+---
+# if the `zk_nodes` array is not defined then we're
+# performing a single-node deployment and we should enable
+# the local kafka-zookeeper service
+- block:
+  - name: Enable kafka-zookeeper service on boot
+    service:
+      name: kafka-zookeeper
+      enabled: yes
+    when: (zk_nodes | default([])) == []
+  - name: Enable kafka service on boot
+    service:
+      name: kafka
+      enabled: yes
+  - name: Enable confluent-schema-registry service on boot
+    service:
+      name: confluent-schema-registry
+      enabled: yes
+    when: kafka_distro == "confluent"
+  become: true

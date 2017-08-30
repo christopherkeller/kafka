@@ -1,0 +1,54 @@
+# (c) 2017 DataNexus Inc.  All Rights Reserved
+---
+# First, setup a fact so that can test whether or not we're installing
+# Apache Kafka from a local directory on the Ansible node (or not)
+- set_fact:
+    install_from_dir: "{{not(local_kafka_file is undefined or local_kafka_file is none or local_kafka_file | trim == '')}}"
+- set_fact:
+    install_from_url: "{{not(kafka_url is undefined or kafka_url is none or kafka_url | trim == '')}}"
+  when: not(install_from_dir)
+# if we're not installing Kafka from a local directory then we're installing
+# from a repository (either a local repository or the standard Apache Kafka
+# repository)
+- block:
+  - name: Download kafka distribution to /tmp
+    become: true
+    get_url:
+      url: "{{kafka_url}}"
+      dest: /tmp
+      mode: 0644
+      validate_certs: no
+    environment: "{{environment_vars | default({})}}"
+  - set_fact:
+      local_filename: "{{kafka_url | basename}}"
+  when: not(install_from_dir)
+# otherwise, if we're installing from a local directory on the Ansible node
+# that we're running this playbook from, copy over the files from that directory
+# to a temporary directory and and install the Confluent packages from those files
+- block:
+  - name: Copy apache kafka distribution from a local directory to /tmp
+    copy:
+      src: "{{local_kafka_file}}"
+      dest: "/tmp"
+      mode: 0644
+  - set_fact:
+      local_filename: "{{local_kafka_file | basename}}"
+  when: install_from_dir
+# finally, create a directory and unpack the distribution we downloaded into
+# that directory
+- block:
+  - name: Create "{{kafka_dir}}"
+    file:
+      path: "{{kafka_dir}}"
+      state: directory
+      owner: "{{kafka_user}}"
+      group: "{{kafka_group}}"
+  - name: Unpack kafka distribution into "{{kafka_dir}}"
+    unarchive:
+      copy: no
+      src: "/tmp/{{local_filename}}"
+      dest: "{{kafka_dir}}"
+      extra_opts: [ "--strip-components=1" ]
+      owner: "{{kafka_user}}"
+      group: "{{kafka_group}}"
+  become: true

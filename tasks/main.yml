@@ -1,0 +1,14 @@
+# (c) 2017 DataNexus Inc.  All Rights Reserved
+---
+- include: install-required-packages.yml static=no
+- include: add-kafka-user.yml static=no
+- include: install-{{kafka_distro}}-kafka.yml static=no
+- include_role:
+    name: configure-kafka-nodes
+- include: create-kafka-services.yml static=no
+- include: enable-kafka-services.yml static=no
+- include: start-kafka-services.yml static=no
+- name: Pausing before creating requested topics
+  command: sleep 10
+  when: (kafka_topics_list | default([])) != []
+- include: add-kafka-topics.yml static=no

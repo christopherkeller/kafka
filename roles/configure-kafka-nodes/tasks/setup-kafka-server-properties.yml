@@ -1,0 +1,61 @@
+# (c) 2017 DataNexus Inc.  All Rights Reserved
+---
+# first, configure our Kafka server instance by setting up
+# the server.properties file and schema-registry.properties
+# files correctly
+- set_fact:
+    kfka_nodes: "{{kafka_nodes | map('extract', hostvars, [('ansible_' + data_iface), 'ipv4', 'address']) | list}}"
+    num_hosts: "{{(kafka_nodes + (existing_nodes | default([]))) | length}}"
+- block:
+  - name: Configure kafka server instance listener address
+    replace:
+      dest: "{{kafka_config_dir}}/server.properties"
+      regexp: '^\#?(([a-zA-Z]*.?)listeners=PLAINTEXT://).*(:9092)$'
+      replace: '\g<1>{{api_addr}}:{{kafka_plaintext_port}},SSL://{{api_addr}}:{{kafka_ssl_port}}'
+  - name: Configure server to use the defined data directory
+    lineinfile:
+      dest: "{{kafka_config_dir}}/server.properties"
+      regexp: "^log.dirs"
+      line: "log.dirs={{log_dir_location}}/kafka"
+  - name: Setup host.name if deploying a kafka cluster
+    lineinfile:
+      dest: "{{kafka_config_dir}}/server.properties"
+      regexp: "^host.name="
+      line: "host.name={{api_addr}}"
+    when: (zk_nodes | default([])) != []
+  - name: Setup broker.id if deploying kafka cluster
+    lineinfile:
+      dest: "{{kafka_config_dir}}/server.properties"
+      regexp: "^broker.id="
+      line: "broker.id={{item.0 + ((existing_node_count | default('0')) | int)}}"
+    with_indexed_items: "{{kfka_nodes}}"
+    when: (num_hosts | int > 1) and (data_addr == item.1)
+  - name: setup confluent-schema-registry listener if deploying a Confluent cluster
+    replace:
+      dest: "{{schema_registry_config_dir}}/schema-registry.properties"
+      regexp: '^(listeners=http://).*(:.*)$'
+      replace: '\g<1>{{api_addr}}:{{schema_registry_port}}'
+    when: schema_registry_config_dir is defined and zk_nodes is defined and zk_nodes != []
+  - name: setup kafkastore connection URL if deploying a Confluent cluster
+    lineinfile:
+      dest: "{{schema_registry_config_dir}}/schema-registry.properties"
+      regexp: '^kafkastore.connection.url='
+      line: "kafkastore.connection.url={{(zk_nodes | default([])) | join(':2181,')}}:2181"
+    when: schema_registry_config_dir is defined and zk_nodes is defined and zk_nodes != []
+  - name: Setup zookeeper.connect value if binding to an external zookeeper ensemble
+    lineinfile:
+      dest: "{{kafka_config_dir}}/server.properties"
+      regexp: "^zookeeper.connect="
+      line: "zookeeper.connect={{(zk_nodes | default([])) | join(':2181,')}}:2181"
+    when: (zk_nodes | default([])) != []
+  become: true
+# then, if a Zookeeper cluster was not passed in using the zk_nodes array,
+# we're performing a single-node deployment so we should configure the local zookeeper
+# instance accordingly
+- name: Configure bundled zookeeper instance to use the defined data directory
+  become: true
+  lineinfile:
+    dest: "{{kafka_config_dir}}/zookeeper.properties"
+    regexp: "^dataDir"
+    line: "dataDir={{log_dir_location}}/zookeeper"
+  when: (zk_nodes | default([])) == []

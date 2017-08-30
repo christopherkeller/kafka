@@ -1,0 +1,82 @@
+# (c) 2017 DataNexus Inc.  All Rights Reserved
+#
+# Defaults that are necessary for all deployments of
+# kafka
+---
+application: kafka
+
+# the distribution of Kafka that should be installed (apache or confluent)
+kafka_distro: confluent
+
+# the directories where the Kafka logs will be written and the kafka distribution
+# will be unpacked into (for the Apache Kafka distribution only)
+kafka_data_dir: /data
+kafka_dir: "/opt/kafka"
+
+# these parameters are used for both confluent and apache distributions
+kafka_topics_list:
+  - { name: metrics, repl_factor: 2, partitions: 3 }
+  - { name: logs, repl_factor: 2, partitions: 3 }
+kafka_package_list: ["java-1.8.0-openjdk", "java-1.8.0-openjdk-devel"]
+
+# the username and group to use when installing/running Kafka
+kafka_group: kafka
+kafka_user: kafka
+
+# the following parameters are only used when provisioning an instance
+# of the apache distribution, but are uncommented here (regardless) to
+# provide reasonable default values when provisioning via Vagrant (where
+# the distribution being provisioned may be different from the default)
+scala_version: "2.11"
+kafka_version: "0.10.1.0"
+# this parameter is used in the `tasks/setup-confluent-kafka.yml` file to
+# determine if a URL for a bundle file was provided (or not); we should not
+# use the bundled Apache Kafka URL as if it were a bundled RPM file containing
+# the RPMs for the Confluent distribution
+default_apache_url: "https://www-us.apache.org/dist/kafka/{{kafka_version}}/kafka_{{scala_version}}-{{kafka_version}}.tgz"
+kafka_url: "{{default_apache_url}}"
+
+# path used to access private keys (defaults to the current working directory)
+private_key_path: "{{playbook_dir}}"
+
+# this value is only used when installing the confluent distribution,
+# but is uncommented here so that it can be used if a confluent distribution
+# is chosen when provisioning via Vagrant
+confluent_version: "3.3"
+confluent_package_name: "confluent-platform-oss-2.11"
+confluent_os_releasever: 7
+
+# used to install kafka from the RPM files in a local gzipped tarfile
+# (when deploying the Apache Kafka dstribution), if it exists and is not
+# an empty string
+local_kafka_file: ""
+
+# ports used by Kafka
+kafka_plaintext_port: 9092
+kafka_ssl_port: 9091
+schema_registry_port: 8081
+
+# this variable defines the default cluster that will be created when
+# deploying to an AWS or OpenStack environment; the value defined here will
+# result in the deployment of a three-node Kafka cluster
+node_map:
+  - { application: kafka, count: 3 }
+
+# and define a set of application-specific security group rules; this list of
+# dictionary entries is used when setting up an application-specific security
+# on the network used by this application; the rules defined here allow for:
+#
+#  - client connections via the kafka_plaintext_port (PLAINTEXT clients)
+#  - client connections via the kafka_ssl_port (SSL clients)
+#  - internal communications via the schema_registry_port (Schema Registry)
+#  - internal communications via port 2181 (the external Zookeeper ensemble)
+#
+# this set of rules should, more than likely, not be overridden; if it is
+# overridden, then care should be taken to at least maintain this default list
+# of application-specific security group rules or the nodes in the cluster may
+# not be able to communicate with each other
+application_sg_rules:
+  - { proto: tcp, from_port: "{{kafka_plaintext_port}}", to_port: "{{kafka_plaintext_port}}", cidr_ip: "{{external_subnet}}" }
+  - { proto: tcp, from_port: "{{kafka_ssl_port}}", to_port: "{{kafka_ssl_port}}", cidr_ip: "{{external_subnet}}" }
+  - { proto: tcp, from_port: "{{schema_registry_port}}", to_port: "{{schema_registry_port}}", cidr_ip: "{{external_subnet}}" }
+  - { proto: tcp, from_port: 2181, to_port: 2181, cidr_ip: "{{internal_subnet}}" }
