@@ -60,7 +60,7 @@ schema_registry_port: 8081
 # deploying to an AWS or OpenStack environment; the value defined here will
 # result in the deployment of a three-node Kafka cluster
 node_map:
-  - { application: kafka, count: 3 }
+  - { application: kafka, count: 1 }
 
 # and define a set of application-specific security group rules; this list of
 # dictionary entries is used when setting up an application-specific security
