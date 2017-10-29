@@ -157,7 +157,7 @@
     node_list_name_list: "{{(node_list_name_list | default([])) + [((item == 'none') | ternary((application + '_nodes'), (application + '_' + item + '_nodes')))]}}"
     app_group_name_list: "{{(app_group_name_list | default([])) + [((item == 'none') | ternary(application, application + '_' + item))]}}"
   with_items: "{{node_role_list}}"
-    
+
 # this handles single subnet, eg, when internal and external uuids are identical
 # openstack instance names must be unique, so we need to add a sequence number to each name
 - block:
@@ -199,7 +199,7 @@
     with_indexed_items: "{{osp_single.results}}"
   when:
     - internal_uuid == external_uuid
-        
+
 # this handles multiple subnets
 # openstack instance names must be unique, so we need to add a sequence number to each name
 - block:
@@ -256,18 +256,17 @@
     with_indexed_items: "{{osp_multiple.results}}"
   when:
     - internal_uuid != external_uuid
-    
+
 # sigh @ ansible for making me do this
 - set_fact:
     osp: "{{ (internal_uuid == external_uuid) | ternary(osp_single, osp_multiple) }}"
-  
+
 # wait_for doesn't work with a proxy, so we need to ssh and check output
 - name: Wait for instances to be accessible via SSH
-  shell: /bin/sleep 20 && /usr/bin/ssh -i "{{ private_keyfile_path }}" "{{ user }}@{{ hostvars[item.server.addresses.private.0['addr']].ansible_host }}" echo DataNexus  
+  shell: /bin/sleep 20 && /usr/bin/ssh -i "{{ private_keyfile_path }}" "{{ user }}@{{ hostvars[item.server.addresses.private.0['addr']].ansible_host }}" echo DataNexus
   register: output
   retries: 4
   delay: 10
   until: output.stdout.find('DataNexus') != -1
   with_items: "{{osp.results}}"
   when: not osp | skipped and osp.changed and osp.results | length > 0
-
