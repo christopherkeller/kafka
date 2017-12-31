@@ -1,0 +1,168 @@
+#!/usr/bin/env ansible-playbook
+#
+# (c) 2016 DataNexus Inc.  All Rights Reserved.
+---
+- name: KAFKA OVERLAY | discovering {{ cloud }} networking
+  tags:
+    - kafka
+    - vm
+  hosts: localhost
+  vars_files:
+    - vars/kafka.yml
+  gather_facts: no
+  tasks:
+    - include_vars: "{{ configuration }}"
+      when: configuration is defined
+      
+    - include_role:
+        name: aws
+        tasks_from: discover-vpc
+      when: cloud == 'aws'  
+
+- name: KAFKA OVERLAY | creating {{ cloud }} security groups
+  tags:
+    - kafka
+    - vm
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - include_vars: "{{ configuration }}"
+      when: configuration is defined
+      
+    - include_role:
+        name: aws
+        tasks_from: create-securitygroup
+      when: cloud == 'aws'       
+
+- name: KAFKA OVERLAY | launching VM
+  tags: vm
+  vars_files:
+    - vars/kafka.yml
+  hosts: localhost
+  connection: local
+  gather_facts: yes
+  tasks:
+    - include_vars: "{{ configuration }}"
+      when: configuration is defined
+      
+    - include_role:
+        name: aws
+        tasks_from: launch-vm
+      when: cloud == 'aws'
+    - include_role:
+        name: osp
+        tasks_from: launch-vm
+      when: cloud == 'osp'  
+
+- name: KAFKA OVERLAY | applying {{ cloud }} security groups
+  tags:
+    - kafka
+  hosts: localhost
+  vars_files:
+    - vars/kafka.yml
+  gather_facts: no
+  tasks:
+    - include_vars: "{{ configuration }}"
+      when: configuration is defined
+      
+    - include_role:
+        name: aws
+        tasks_from: apply-securitygroup
+      when: cloud == 'aws'    
+
+- name: KAFKA OVERLAY | gathering {{ cloud }} inventory
+  tags:
+    - kafka
+    - vm
+  hosts: localhost
+  vars_files:
+    - vars/kafka.yml
+  gather_facts: no
+  tasks:
+    - include_vars: "{{ configuration }}"
+      when: configuration is defined
+    
+    - include_role:
+        name: aws
+        tasks_from: discover-vm
+      vars:
+        application: "{{ item }}"
+      with_items:
+        - kafka
+        - zookeeper
+      loop_control:
+        loop_var: outer_item
+      when: cloud == 'aws'
+      
+# If we're dynamically provisioning, then do some final configuration on the
+# VMs that were just launched (assuming that we're not re-using existing VMs)
+- name: KAFKA OVERLAY | completing OS configuration
+  tags: vm
+  hosts: kafka
+  gather_facts: yes
+  vars_files:
+    - vars/kafka.yml
+  tasks:
+    - include_vars: "{{ configuration }}"
+      when: configuration is defined
+      
+    - include_role:
+        name: initialize-play
+      vars:
+        gather_facts: false
+
+    - block:
+      # then run the `preflight` role to finish the configuration of the nodes
+      # that were just allocated
+      - include_role:
+          name: preflight
+        vars:
+          mountpoint: "/data"
+
+      when:
+        - cloud is defined and (cloud == 'aws' or cloud == 'osp')
+
+# Collect some Zookeeper related facts
+- name: KAFKA OVERLAY | gathering facts from zookeeper host group (if defined)
+  tags:
+    - vm
+    - kafka
+  hosts: zookeeper
+  tasks: []
+
+# And deploy Kafka to the nodes in the `kafka` host group; note that if
+# there is more than one node in the `kafka` host group, those nodes will be
+# configured as a Kafka cluster
+- name: KAFKA OVERLAY | installing {{ application }} server(s)
+  tags:
+    - vm
+    - kafka
+  hosts: kafka
+  gather_facts: no
+  vars_files:
+    - vars/kafka.yml
+  vars:
+    - combined_package_list: "{{ (default_packages|default([])) | union(kafka_package_list) | union((install_packages_by_tag|default({})).kafka|default([])) }}"
+    - kafka_nodes: "{{groups['kafka']}}"
+    - zookeeper_nodes: "{{groups['zookeeper'] | default([])}}"
+  pre_tasks:
+    - include_vars: "{{ configuration }}"
+      when: configuration is defined
+    # first, initialize the play by loading any `local_vars_file` that may have
+    # been passed in, restarting the network on the target nodes (if desired),
+    # and determining the `data_iface` and `api_iface` values from the input
+    # `iface_description_array` (if one was passed in)
+    - include_role:
+        name: initialize-play
+    # and setup the nodes to use the defined web proxy (if one is defined via a set
+    # of extra variables or through a set of environment variables in the shell
+    # that the playbook command is being run from)
+    - include_role:
+        name: http-proxy
+    # and now that we know the name of our `data_iface`, we can construct the
+    # list of zk_nodes (the data_iface IP addresses of our zookeeper_nodes)
+    - set_fact:
+        zk_nodes: "{{(zookeeper_nodes | default([])) | map('extract', hostvars, [('ansible_' + data_iface), 'ipv4', 'address']) | list}}"
+  # now that we have all of the facts we need, provision the input nodes
+  roles:
+    - role: kafka

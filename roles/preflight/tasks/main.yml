@@ -5,11 +5,11 @@
 # if we have multiple networks, then add the interface script for
 # the public interface and configure the public and private networks
 - block:
-  - name: configuring no default route on eth0 for {{ application }}
+  - name: KAFKA OVERLAY | configuring no default route on eth0 for {{ application }}
     become: true
     lineinfile: name="/etc/sysconfig/network-scripts/ifcfg-eth0" regexp='^DEFROUTE=' line='DEFROUTE=no'
     
-  - name: creating ifcfg-{{ api_iface }}
+  - name: cKAFKA OVERLAY | reating ifcfg-{{ api_iface }}
     become: true
     blockinfile:
       path: "/etc/sysconfig/network-scripts/ifcfg-{{ api_iface }}"
@@ -21,7 +21,7 @@
         ONBOOT=yes
         TYPE=Ethernet
         USERCTL=no
-  - name: restart networking
+  - name: KAFKA OVERLAY | restarting networking
     become: true
     systemd: "name=network state=restarted" 
   
@@ -42,10 +42,10 @@
 # that device and mount it at the named mount point
 - block:
   # build a filesystem on that block device
-  - name: Build a filesystem on {{block_device}}
+  - name: KAFKA OVERLAY | Build a filesystem on {{block_device}}
     command: /usr/sbin/mkfs -t ext4 {{block_device}}
   # and mount it
-  - name: Mount {{block_device}} as {{mountpoint}}
+  - name: KAFKA OVERLAY | Mount {{block_device}} as {{mountpoint}}
     mount:
       name: "{{mountpoint}}"
       src: "{{block_device}}"
@@ -55,9 +55,9 @@
   when: data_volume is defined and (block_device.replace('/dev/','') in ansible_devices.keys()) and not(block_device in mounted_devices)
 # configure the local SSH daemon and restart it
 - block:
-  - name: Ensure sshd_config is writeable
+  - name: KAFKA OVERLAY |  Ensure sshd_config is writeable
     command: /bin/chattr -i /etc/ssh/sshd_config
-  - name: Ensure sshd listens on provisioning network
+  - name: KAFKA OVERLAY | Ensure sshd listens on provisioning network
     lineinfile:
       dest: /etc/ssh/sshd_config
       regexp: "^#ListenAddress 0.0.0.0"
@@ -71,26 +71,26 @@
 # generate a hostname
 - block:
   # first generate a new UUID value
-  - name: Generate a UUID
+  - name: KAFKA OVERLAY | Generate a UUID
     shell: /usr/bin/uuidgen | /usr/bin/tr -d \-
     register: uuid
   # then use that UUID to set a unique hostname
-  - name: Set hostname actively so rebooting is unnecessary
+  - name: KAFKA OVERLAY | Set hostname actively so rebooting is unnecessary
     command: /usr/bin/hostnamectl set-hostname {{application}}-{{uuid.stdout}}
-  - name: Set pretty hostname actively so rebooting is unnecessary
+  - name: KAFKA OVERLAY | Set pretty hostname actively so rebooting is unnecessary
     command: /usr/bin/hostnamectl --pretty set-hostname "{{tenant}} {{application}}"
-  - name: Set new hostname in /etc/hostname
+  - name: KAFKA OVERLAY | Set new hostname in /etc/hostname
     replace:
       path: /etc/hostname
       regexp: "{{hostvars[inventory_hostname].ansible_hostname}}.ec2.internal"
       replace: "{{application}}-{{uuid.stdout}}.localdomain"
-  - name: Set HOSTNAME in /etc/sysconfig/network
+  - name: KAFKA OVERLAY | Set HOSTNAME in /etc/sysconfig/network
     lineinfile:
       dest: /etc/sysconfig/network
       state: present
       insertafter: EOF
       line: "HOSTNAME={{application}}-{{uuid.stdout}}.localdomain"
-  - name: Set {{data_iface}} address to new hostname in /etc/hosts
+  - name: KAFKA OVERLAY | Set {{data_iface}} address to new hostname in /etc/hosts
     lineinfile:
       dest: /etc/hosts
       insertafter: EOF
@@ -98,7 +98,7 @@
       # backrefs: yes
       # line: "127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4 {{hostvars[inventory_hostname].ansible_hostname}}"
       line: "{{hostvars[inventory_hostname]['ansible_' + data_iface].ipv4.address}}    {{application}}-{{uuid.stdout}}.localdomain {{application}}-{{uuid.stdout}} {{application}}"
-  - name: Ensure hostname changes persist after reboot
+  - name: KAFKA OVERLAY | Ensure hostname changes persist after reboot
     lineinfile:
       dest: /etc/cloud/cloud.cfg
       state: present
@@ -111,13 +111,13 @@
     - ansible_distribution == 'CentOS' or ansible_distribution == 'RedHat'
 # community CentOS AMI ships with postfix enabled so we need to disable it
 - block:
-  - name: Stop postfix
+  - name: KAFKA OVERLAY | stopping postfix
     service:
       name: postfix
       state: stopped
     failed_when: false
   # annnnd remove it
-  - name: Remove postfix
+  - name: KAFKA OVERLAY | removing postfix
     package:
       name: postfix
       state: absent

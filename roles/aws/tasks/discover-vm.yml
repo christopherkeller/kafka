@@ -1,0 +1,29 @@
+# (c) 2016 DataNexus Inc.  All Rights Reserved.
+#
+# discover AWS inventory
+---
+- name: KAFKA OVERLAY | setting key_path
+  set_fact: key_path="{{ ansible_env.PWD }}"
+  when: key_path is not defined
+  
+- name: KAFKA OVERLAY | discovering {{ outer_item }} nodes
+  ec2_instance_facts:
+    region: "{{ region }}"
+    filters:
+      instance-state-name: running
+      "tag:Tenant": "{{ tenant }}"
+      "tag:Project": "{{ project }}"
+      "tag:Domain": "{{ domain }}"
+      "tag:Application": "{{ outer_item }}"
+      "tag:Cluster": "{{ cluster | default ('a') }}"
+      "tag:Dataflow": "{{ dataflow | default ('none') }}"
+  register: filtered_instances
+  when: cloud == 'aws'
+
+- name: KAFKA OVERLAY | building {{ outer_item }} host group
+  add_host: hostname="{{ item }}" groupname="{{ outer_item }}" ansible_user="{{ user }}" ansible_ssh_private_key_file="{{ key_path }}/{{cloud }}-{{ region }}-{{ project }}-{{ outer_item }}-{{ domain }}-private-key.pem"
+  with_items: "{{ filtered_instances.instances | map (attribute='private_ip_address') | list }}"
+  when:
+    - cloud == 'aws'
+    - filtered_instances is defined
+    - filtered_instances.instances|length > 0
