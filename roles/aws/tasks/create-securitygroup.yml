@@ -1,0 +1,51 @@
+# (c) 2016 DataNexus Inc.  All Rights Reserved.
+#
+# create AWS postgresql security group rules
+---
+- name: KAFKA OVERLAY | creating kafka private internal security group
+  local_action:
+    module: ec2_group
+    name: "dnsg_{{ project }}_kafka_private_internal"
+    description: "kafka ingress and unrestricted egress rules (ansible)"
+    vpc_id: "{{ specified_vpc.vpcs.0.id }}"
+    region: "{{ region }}"
+    rules:
+      # 
+      - proto: tcp
+        from_port: 2181
+        to_port: 2181
+        cidr_ip: "{{ internal_subnet }}"
+    rules_egress:
+      # Allow all outbound
+      - proto: all
+        cidr_ip: 0.0.0.0/0
+  register: sg_kafka_internal
+
+- name: KAFKA OVERLAY | creating kafka public internal security group
+  local_action:
+    module: ec2_group
+    name: "dnsg_{{ project }}_kafka_private_external"
+    description: "kafka ingress and unrestricted egress rules (ansible)"
+    vpc_id: "{{ specified_vpc.vpcs.0.id }}"
+    region: "{{ region }}"
+    rules:
+      # kafka schema registry
+      - proto: tcp
+        from_port: 8081
+        to_port: 8081
+        cidr_ip: "{{ external_subnet }}"
+      # kafka via SSL
+      - proto: tcp
+        from_port: 9091
+        to_port: 9091
+        cidr_ip: "{{ external_subnet }}"
+      # kafka via plaintext
+      - proto: tcp
+        from_port: 9092
+        to_port: 9092
+        cidr_ip: "{{ external_subnet }}"    
+    rules_egress:
+      # Allow all outbound
+      - proto: all
+        cidr_ip: 0.0.0.0/0
+  register: sg_kafka_external

@@ -55,28 +55,3 @@ local_kafka_file: ""
 kafka_plaintext_port: 9092
 kafka_ssl_port: 9091
 schema_registry_port: 8081
-
-# this variable defines the default cluster that will be created when
-# deploying to an AWS or OpenStack environment; the value defined here will
-# result in the deployment of a three-node Kafka cluster
-node_map:
-  - { application: kafka, count: 3 }
-
-# and define a set of application-specific security group rules; this list of
-# dictionary entries is used when setting up an application-specific security
-# on the network used by this application; the rules defined here allow for:
-#
-#  - client connections via the kafka_plaintext_port (PLAINTEXT clients)
-#  - client connections via the kafka_ssl_port (SSL clients)
-#  - internal communications via the schema_registry_port (Schema Registry)
-#  - internal communications via port 2181 (the external Zookeeper ensemble)
-#
-# this set of rules should, more than likely, not be overridden; if it is
-# overridden, then care should be taken to at least maintain this default list
-# of application-specific security group rules or the nodes in the cluster may
-# not be able to communicate with each other
-application_sg_rules:
-  - { proto: tcp, from_port: "{{kafka_plaintext_port}}", to_port: "{{kafka_plaintext_port}}", cidr_ip: "{{external_subnet}}" }
-  - { proto: tcp, from_port: "{{kafka_ssl_port}}", to_port: "{{kafka_ssl_port}}", cidr_ip: "{{external_subnet}}" }
-  - { proto: tcp, from_port: "{{schema_registry_port}}", to_port: "{{schema_registry_port}}", cidr_ip: "{{external_subnet}}" }
-  - { proto: tcp, from_port: 2181, to_port: 2181, cidr_ip: "{{internal_subnet}}" }
