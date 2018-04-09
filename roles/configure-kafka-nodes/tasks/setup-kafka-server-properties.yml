@@ -7,6 +7,22 @@
     kfka_nodes: "{{kafka_nodes | map('extract', hostvars, [('ansible_' + data_iface), 'ipv4', 'address']) | list}}"
     num_hosts: "{{(kafka_nodes + (existing_nodes | default([]))) | length}}"
 - block:
+  # these two settings doens't belong here
+  - name: KAFKA PRODUCER OVERLAY | inflating kafka heap to 6GB
+    lineinfile:
+      dest: /bin/kafka-server-start
+      regexp: '^    export KAFKA_HEAP_OPTS="-Xmx1G -Xms1G"'
+      line: '    export KAFKA_HEAP_OPTS="-Xmx4G -Xms1G"'
+  - name: KAFKA PRODUCER OVERLAY | inflating kafka worker heap to 512MB
+    lineinfile:
+      dest: /bin/kafka-run-class
+      regexp: '^  KAFKA_HEAP_OPTS="-Xmx256M"'
+      line: '  KAFKA_HEAP_OPTS="-Xmx3G"'
+  - name: KAFKA PRODUCER OVERLAY | enabling topic deletion configuration
+    lineinfile:
+      dest: "{{ kafka_config_dir }}/server.properties"
+      regexp: '^#delete.topic.enable=true'
+      line: "delete.topic.enable=true"
   - name: Configure kafka server instance listener address
     replace:
       dest: "{{kafka_config_dir}}/server.properties"

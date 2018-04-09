@@ -10,10 +10,15 @@
     vpc_id: "{{ specified_vpc.vpcs.0.id }}"
     region: "{{ region }}"
     rules:
-      # 
+      # zookeeper traffic
       - proto: tcp
         from_port: 2181
         to_port: 2181
+        cidr_ip: "{{ internal_subnet }}"
+      # ReST connector
+      - proto: tcp
+        from_port: 8083
+        to_port: 8083
         cidr_ip: "{{ internal_subnet }}"
     rules_egress:
       # Allow all outbound
