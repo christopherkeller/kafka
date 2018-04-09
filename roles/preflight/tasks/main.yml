@@ -9,7 +9,7 @@
     become: true
     lineinfile: name="/etc/sysconfig/network-scripts/ifcfg-eth0" regexp='^DEFROUTE=' line='DEFROUTE=no'
     
-  - name: cKAFKA OVERLAY | reating ifcfg-{{ api_iface }}
+  - name: KAFKA OVERLAY | reating ifcfg-{{ api_iface }}
     become: true
     blockinfile:
       path: "/etc/sysconfig/network-scripts/ifcfg-{{ api_iface }}"

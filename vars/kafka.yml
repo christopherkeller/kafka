@@ -28,7 +28,7 @@ kafka_user: kafka
 # provide reasonable default values when provisioning via Vagrant (where
 # the distribution being provisioned may be different from the default)
 scala_version: "2.11"
-kafka_version: "0.10.1.0"
+kafka_version: "0.11.0.2"
 # this parameter is used in the `tasks/setup-confluent-kafka.yml` file to
 # determine if a URL for a bundle file was provided (or not); we should not
 # use the bundled Apache Kafka URL as if it were a bundled RPM file containing
